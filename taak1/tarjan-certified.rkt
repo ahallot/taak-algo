@@ -67,7 +67,7 @@
        (lambda (from to) ; before =>
          (when (not (eq? (vector-ref stack to) included-tag))
            ;(newline)
-           ;
+           ;(display from)
            ;(display " =fw=> ")
            ;(display to)         ;used to show edges added to FW
            (add-edge! fw from to)))                                                      ;edge-discovered
@@ -76,15 +76,6 @@
            (vector-set! highest-back-edge
                         from (min (vector-ref highest-back-edge from)
                                   (vector-ref highest-back-edge to)))
-           ;(newline)
-           ;(display "CONS =======>")(display (cons from to))
-           ;(if (and (= from 11)
-           ;         (= to 12))
-           ;    (begin
-           ;      (newline)
-           ;(display highest-back-edge)
-           ;(newline)
-           ;(display preorder-numbers)))
            (when (and (< (vector-ref highest-back-edge to)  (vector-ref preorder-numbers from))
                       (not (member from bw-from)))
              
@@ -259,7 +250,7 @@
          (sc-components (cadr (cddr (cdr certified))))
          (first-check (first-check-func g DAG fw bw))
          (second-check (second-check-func fw bw g))
-         (third-check #t)
+         (third-check (third-check-func DAG fw bw sc-components))
          (fourth-check #t))
     (display "First Check Result : ")(display first-check)
     (newline)
@@ -281,7 +272,8 @@
         (vector-g (make-vector order-g 0)))
     (lb:for-each-node
      DAG
-     (lambda (dag-node label)(let ((component-elementen (car label)))
+     (lambda (node-index info-node)
+       (let ((component-elementen (car info-node)))
                          (for-each
                           (lambda (g-node)
                             (if (< g-node order-g)
@@ -306,24 +298,53 @@
     result))
 
 (define (second-check-func fw bw g)
-  (let ((result #f))
-      (dft
-       g
-       root-nop
-       root-nop
-       root-nop
-       edge-nop
-       edge-nop
-       edge-nop)
-    result))
-
-(define (third-check-func fw bw g)
   (let ((result #t))
     (define (set-res g from to)
       (unless (adjacent? g from to)
         (set! result #f)))
     (for-each-node fw (lambda (from)(for-each-edge fw from (lambda (to)(set-res g from to)))))
     (for-each-node bw (lambda (from)(for-each-edge bw from (lambda (to)(set-res g from to)))))
+    result))
+
+(define (third-check-func DAG fw bw sc-components)
+  (let ((result #t)
+        (current-reachables '())
+        (result-dag (make-vector (order fw) '())))
+    
+    (define (add-to-reachable-elements value)
+      (unless (member value current-reachables)
+      (set! current-reachables (append current-reachables (list value))))
+      (for-each
+       (lambda (node)
+         (let((reachables (vector-ref result-dag node)))
+      (unless (member value reachables)
+             (vector-set! result-dag node current-reachables))))
+       current-reachables))
+    
+    (define (check-fw-or-bw fw-or-bw)
+      (dft
+       fw-or-bw
+       (lambda (node)(set! current-reachables '()))
+       (lambda (node)(add-to-reachable-elements node))
+       (lambda (node)(add-to-reachable-elements node))
+       (lambda (from to)(add-to-reachable-elements to))
+       (lambda (from to)(add-to-reachable-elements to))
+       (lambda (from to)(add-to-reachable-elements to))))
+    (check-fw-or-bw fw)
+    (check-fw-or-bw bw)
+    (lb:for-each-node
+     DAG
+     (lambda (index-node info-node)
+       (let ((component-elementen (car info-node)))
+         (for-each
+          (lambda (element) (unless(equal? (vector-ref result-dag element) component-elementen)
+                              (set! result #f)))
+          component-elementen))))
+     
+    (newline)
+    (display result-dag)
+    (newline)
+    
     result))
 
 (define (fourth-check-func fw bw g)
@@ -351,16 +372,25 @@
    list-graph))
 
 (define empty-graph (new #t 1))
-(define list-graph-test (list ;(cons empty-graph "empty-graph")
+(define list-graph-test (list (cons empty-graph "empty-graph")
                               (cons paper-example "paper-example")
-                              ;(cons sedgewick172 "sedgewick172")
-                              ;(cons sedgewick172-bis "sedgewick172-bis")
-                              ;(cons sedgewick172-tris "sedgewick172-tris")
-                              ;(cons full-cycle "full-cycle")
-                              ;(cons a-list "a-list")
-                              ;(cons dag-1 "dag-1")
-                              ;(cons scc4 "scc4")
+                              (cons sedgewick172 "sedgewick172")
+                              (cons sedgewick172-bis "sedgewick172-bis")
+                              (cons sedgewick172-tris "sedgewick172-tris")
+                              (cons full-cycle "full-cycle")
+                              (cons a-list "a-list")
+                              (cons dag-1 "dag-1")
+                              (cons scc4 "scc4")
                               ))
 
 (call-all-on-graphs list-graph-test)
+
+;(dft
+; graph
+; lambda-root
+; lambda-discover-node
+; lambda-mark-node
+; lambda-discover-edge
+; lambda-mark-edge
+; lambda-bumb-edge)
 
