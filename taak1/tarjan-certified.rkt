@@ -257,7 +257,7 @@
          (bw (cadr (cdr certified)))
          (nr-of-components (cadr (cddr certified)))
          (sc-components (cadr (cddr (cdr certified))))
-         (first-check (first-check-func g DAG))
+         (first-check (first-check-func g DAG fw bw))
          (second-check (second-check-func fw bw g))
          (third-check #t)
          (fourth-check #t))
@@ -273,34 +273,48 @@
     (and first-check second-check third-check fourth-check)
     ))
 
-(define (first-check-func g DAG)
+(define (first-check-func g DAG fw bw)
   (let* ((result #t)
-        (total-node-gerepresenteerd-in-dag 0)
         (order-g (order g))
+        (total-node-gerepresenteerd-in-dag 0)
+        (fw-elements '())
         (vector-g (make-vector order-g 0)))
     (lb:for-each-node
      DAG
      (lambda (dag-node label)(let ((component-elementen (car label)))
                          (for-each
-                          (lambda (g-node)(let ((value (vector-ref vector-g g-node)))
-                                            (if (= value 0)
-                                                (begin
-                                                  (vector-set! vector-g g-node (+ value 1))
-                                                  (set! total-node-gerepresenteerd-in-dag
-                                                        (+ total-node-gerepresenteerd-in-dag 1)))
-                                                (set! result #f))))
+                          (lambda (g-node)
+                            (if (< g-node order-g)
+                                (let ((value (vector-ref vector-g g-node)))
+                                  (if (= value 0)
+                                      (begin
+                                        (vector-set! vector-g g-node (+ value 1))
+                                        (set! total-node-gerepresenteerd-in-dag
+                                              (+ total-node-gerepresenteerd-in-dag 1)))
+                                      (set! result #f)))
+                                (set! result #f)))
                           component-elementen))))
-     (unless (= total-node-gerepresenteerd-in-dag order-g)
+    (unless (= total-node-gerepresenteerd-in-dag order-g)
          (set! result #f))
+    (for-each-node
+     fw
+     (lambda (node) (set! fw-elements (append fw-elements (list node)))))
+    (for-each-node
+     bw
+     (lambda (node) (unless (member node fw-elements)
+                      (set! result #f))))
     result))
 
 (define (second-check-func fw bw g)
-  (let ((result #t))
-    (define (set-res g from to)
-      (unless (adjacent? g from to)
-        (set! result #f)))
-    (for-each-node fw (lambda (from)(for-each-edge fw from (lambda (to)(set-res g from to)))))
-    (for-each-node bw (lambda (from)(for-each-edge bw from (lambda (to)(set-res g from to)))))
+  (let ((result #f))
+      (dft
+       g
+       root-nop
+       root-nop
+       root-nop
+       edge-nop
+       edge-nop
+       edge-nop)
     result))
 
 (define (third-check-func fw bw g)
