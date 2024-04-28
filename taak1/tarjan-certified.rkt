@@ -122,7 +122,7 @@
 (define witness car)
 
 ;our checker will use our certification to apply 4 different check for this algorithme
-(define (checker g certification)
+(define (check-tarjan g certification)
   (let* ((w (witness certification))
          (DAG (car w))
          (fw (cadr w))
@@ -276,7 +276,7 @@
   (newline)
   (display (list (string-append "SCC-TARJAN CERTIFIED  :  "  text)(scc-tarjan-certified g)))
   (newline)
-  (checker g (scc-tarjan-certified g)))
+  (check-tarjan g (scc-tarjan-certified g)))
 
 ;call for all graph in a list of graphs the previous function & gives you number of successes for the amount of try we did
 (define (call-all-on-graphs list-graphs)
