@@ -6,129 +6,88 @@
         (a-d graph unweighted config)
         (prefix (a-d graph labeled config) lb:)
         (a-d graph-traversing dft-unweighted)
+        (a-d graph-algorithms directed connectivity)
         (a-d graph examples directed-unweighted))
 
-; Net zoals bij de algoritmes van boogsamenhangendheid en bigeconnecteerdheid in ONgerichte grafen,
-; worden er om sterke samenhangendheid te gaan bepalen, preorder-nummers uitgedeeld aan iedere knoop en
-; wordt er bekeken wat het kleinste preorder-nummer is dat we vanuit een knoop kunnen bereiken
-; (cref. principe van Hopcroft-Tarjan)
-
-
-  
-
-(define (scc-tarjan g)  ;scc-tarjan-vectorstack
+(define (scc-tarjan-certified g)  
   (define order-g (order g))
   (define preorder-time 0)
   (define preorder-numbers (make-vector order-g -1))
   (define highest-back-edge (make-vector order-g -1))
   (define sc-components (make-vector order-g -1))
   (define nr-of-components 0)
-  (define stack (make-vector order-g '())) ;!!! stack als vector
-  (define top '()) ;!!!
-  (define included-tag 'included) ;!!! ipv aparte included-vector
+  (define stack (make-vector order-g '()))
+  (define top '()) 
+  (define included-tag 'included) 
   
   (define fw (new #t order-g))
   (define bw (new #t order-g))
 
-  (define bw-from '())
-
-  
-  
   (define dag-representation '())
 
   (define (add-representation cons-cel)
     (set! dag-representation (append dag-representation (list cons-cel))))
   
-  ;(define (low node)
-  ;  (let* ((highest (vector-ref highest-back-edge node)))
-  ;    (if (< highest 0)
-  ;        node
-  ;        (vector-ref preorder-numbers highest))))
-  
   (dft g
-       root-nop                                                    ;root-discovered
-       (lambda (node) ;node-discovered
-         (vector-set! stack node top) ;!!! onthou de "parent" in het pad op de stack-vector
-         (set! top node) ;!!! nieuwe top = push
+       root-nop                                                   
+       (lambda (node) 
+         (vector-set! stack node top) 
+         (set! top node)
          (vector-set! preorder-numbers node preorder-time)
          (vector-set! highest-back-edge node preorder-time)
          (set! preorder-time (+ preorder-time 1)))
-       (lambda (node)                                              ;node-processed
+       (lambda (node)                                             
          (when (= (vector-ref highest-back-edge node)
                   (vector-ref preorder-numbers node)) 
            (set! nr-of-components (+ 1 nr-of-components))
            (let loop
-             ((t top)) ;!!! = #
-             (set! top (vector-ref stack t)) ;!!! pop! = reset top naar de "vorige op het pad"
-             (vector-set! stack t included-tag) ;!!! registreer in je stack-vector dat de node t tot een component behoort
+             ((t top))
+             (set! top (vector-ref stack t)) 
+             (vector-set! stack t included-tag) 
              (vector-set! sc-components t nr-of-components)
              (unless (eq? t node)
-               (loop top))))) ;!!! = # (voor volgende pop!)
-       (lambda (from to) ; before =>
+               (loop top)))))
+       (lambda (from to)
          (when (not (eq? (vector-ref stack to) included-tag))
-           ;(newline)
-           ;(display from)
-           ;(display " =fw=> ")
-           ;(display to)         ;used to show edges added to FW
-           (add-edge! fw from to)))                                                      ;edge-discovered
-       (lambda (from to)                                           ;edge-processed
-         (when (not (eq? (vector-ref stack to) included-tag)) ;!!!
+           (add-edge! fw from to)))                                                     
+       (lambda (from to)
+         (when (not (eq? (vector-ref stack to) included-tag))
            (vector-set! highest-back-edge
                         from (min (vector-ref highest-back-edge from)
-                                  (vector-ref highest-back-edge to)))
-           (when (and (< (vector-ref highest-back-edge to)  (vector-ref preorder-numbers from))
-                      (not (member from bw-from)))
-             
-             (set! bw-from (append bw-from (list from)))
-             ;(newline)
-             ;(display from)
-             ;(display " =bw=> ")
-             ;(display to)         ;used to show edges added to BW
-             (add-edge! bw from to)))
+                                  (vector-ref highest-back-edge to))))
+         
+         (when (< (vector-ref highest-back-edge to) (vector-ref preorder-numbers from))                    
+           (add-edge! bw from to))
+         
          (if (not(= (vector-ref highest-back-edge from) (vector-ref highest-back-edge to)))
              (add-representation (cons from to)))
          
          (when (not (= (vector-ref sc-components to) (vector-ref sc-components from)))
-           ;(newline)
-           ;(display from)
-           ;(display " XfwX> ")
-           ;(display to)         ;used to show edges removed from FW
            (delete-edge! fw from to)))
-       (lambda (from to)                                           ;edge-bumped        
-         (when (not (eq? (vector-ref stack to) included-tag)) ;!!!
+       (lambda (from to)                                                  
+         (when (not (eq? (vector-ref stack to) included-tag)) 
            (vector-set! highest-back-edge
                         from (min (vector-ref highest-back-edge from)
-                                  (vector-ref preorder-numbers to)))
-          (when (and (= (vector-ref highest-back-edge from) (vector-ref preorder-numbers to))
-                      (not (member from bw-from)))
-             (set! bw-from (append bw-from (list from)))
-             ;(newline)
-             ;(display from)
-             ;(display " =bw=> ")
-             ;(display to)         ;used to show edges removed from BW
-             (add-edge! bw from to)))))
+                                  (vector-ref preorder-numbers to))))
+          (when (= (vector-ref highest-back-edge from) (vector-ref preorder-numbers to))
+             (add-edge! bw from to))))
 
   (let ((DAG (lb:new #t nr-of-components))
         (seen-sc-representative '())
         (sc-node-representor (make-vector nr-of-components #f)))
-
     (define (add-dag-edge from to cons-cel)
       (let*((new-from (- (vector-ref sc-components from) 1))
             (new-to(- (vector-ref sc-components to) 1))
             (label (lb:edge-label DAG new-from new-to)))
         (if label
             (lb:add-edge! DAG new-from new-to (append label (list cons-cel)))
-            (lb:add-edge! DAG new-from new-to (list cons-cel)))))
-      
-    
+            (lb:add-edge! DAG new-from new-to (list cons-cel)))))   
     (dft
      g
      root-nop
      (lambda (node) (let((DAG-index (- (vector-ref sc-components node) 1)))
                         (if (not (member DAG-index seen-sc-representative))
                         (begin
-                          ;(newline)
-                          ;(display (cons (list node) node))
                           (lb:label! DAG DAG-index (cons (list node) node))
                           (set! seen-sc-representative (append seen-sc-representative (list DAG-index))))
                         (let ((label (lb:label DAG DAG-index)))
@@ -144,103 +103,8 @@
     
   (list DAG fw bw nr-of-components sc-components)))
 
-(define paper-example 
-  (let ((g (new #t 8)))
-    (add-edge! g 0 1)
-    (add-edge! g 1 2)
-    (add-edge! g 2 0)
-    (add-edge! g 1 3)
-    (add-edge! g 3 4)
-    (add-edge! g 4 5)
-    (add-edge! g 4 6)
-    (add-edge! g 5 3)
-    (add-edge! g 6 3)
-    (add-edge! g 7 1)
-    (add-edge! g 7 2)
-    (add-edge! g 7 3)
-    (add-edge! g 7 4)
-    g))
 
 
-
-;;TESTS
-;(display (list "SCC-tarj    paper-example" (scc-tarjan             paper-example)))
-;(newline)  ;{3 . #(2 2 2 1 1 1 1 3)}
-;(display (list "SCC-tarj    sedgewick172" (scc-tarjan             sedgewick172)))
-;(newline)  ;{3 . #(2 2 2 3 1 1)}
-;(display (list "SCC-tarj    full-cycle"   (scc-tarjan             full-cycle)))
-;(newline)  ;;{1 . #(1 1 1 1 1 1)}
-;(display (list "SCC-tarj    a-list"       (scc-tarjan             a-list)))
-;(newline)  ;{6 . #(6 5 4 1 2 3)}
-;(display (list "SCC-tarj    scc4"         (scc-tarjan             scc4)))
-;(newline)  ;{4 . #(3 1 3 3 3 3 3 4 4 2 2 2 2)}
-
-
-
-
-(define (test g)
-  (define preorder-time 0)
-  (define preorder-numbers (make-vector (order g) -1))
-  (define highest-back-edge (make-vector (order g) -1))
-  (define sc-components (make-vector (order g) -1))
-  (define included (make-vector (order g) #f))
-  (define nr-of-components 0)
-  (define stack (stack:new))
-  (dft
-   g
-   root-nop
-   (lambda (node)
-     ;(display "Discovered Node: ")
-     ;(display node)
-     ;(newline)
-     (stack:push! stack node)
-     (vector-set! preorder-numbers node preorder-time)
-     (vector-set! highest-back-edge node preorder-time)
-     (set! preorder-time (+ preorder-time 1)))
-   (lambda (node)
-     ;(display "Marked Node : ")
-     ;(display node)
-     ;(newline)
-     (when (= (vector-ref highest-back-edge node)
-              (vector-ref preorder-numbers node)) 
-       (set! nr-of-components (+ 1 nr-of-components))
-       (let loop
-         ((t (stack:pop! stack))) 
-         (vector-set! sc-components t nr-of-components)
-         (vector-set! included t #t)
-         (unless (eq? t node)
-           (loop (stack:pop! stack))))))
-   ;(lambda (from to)
-   ;(display "Discovered Edge: ")
-   ;(display "From  ")
-   ;(display from)
-   ;(display" To ")
-   ;(display to)
-   ;(newline)); before
-   edge-nop
-   (lambda (from to) ; after =>
-     ;(display "AFTER Edge: ")
-     ;(display "From  ")
-     ;(display from)
-     ;(display" To ")
-     ;(display to)
-     ;(newline)
-     (if (not (vector-ref included to))
-         (vector-set! highest-back-edge
-                      from (min (vector-ref highest-back-edge from)
-                                (vector-ref highest-back-edge to)))))
-   (lambda (from to) ; bump  => avoid cross-edges
-     ;(display "BUMP Edge: ")
-     ;(display "From  ")
-     ;(display from)
-     ;(display" To ")
-     ;(display to)
-     ;(newline)
-     (if (not (vector-ref included to))
-         (vector-set! highest-back-edge
-                      from (min (vector-ref highest-back-edge from)
-                                (vector-ref preorder-numbers to))))))
-  (cons nr-of-components sc-components))
 
 (define (checker g certified )
   (let* ((DAG (car certified))
@@ -250,8 +114,8 @@
          (sc-components (cadr (cddr (cdr certified))))
          (first-check (first-check-func g DAG fw bw))
          (second-check (second-check-func fw bw g))
-         (third-check (third-check-func DAG fw bw sc-components))
-         (fourth-check #t))
+         (third-check (third-check-func DAG fw bw))
+         (fourth-check (fourth-check-func DAG g)))
     (display "First Check Result : ")(display first-check)
     (newline)
     (display "Second Check Result : ")(display second-check)
@@ -261,6 +125,7 @@
     (display "Fourth Check Result : ")(display fourth-check)
     (newline)
     (display "Checker final Result : ")(display(and first-check second-check third-check fourth-check))
+    (newline)
     (and first-check second-check third-check fourth-check)
     ))
 
@@ -306,73 +171,114 @@
     (for-each-node bw (lambda (from)(for-each-edge bw from (lambda (to)(set-res g from to)))))
     result))
 
-(define (third-check-func DAG fw bw sc-components)
+(define (third-check-func DAG fw bw)
   (let ((result #t)
-        (current-reachables '())
-        (result-dag (make-vector (order fw) '())))
+        (current-reachables '()))
     
-    (define (add-to-reachable-elements value)
-      (unless (member value current-reachables)
-      (set! current-reachables (append current-reachables (list value))))
-      (for-each
-       (lambda (node)
-         (let((reachables (vector-ref result-dag node)))
-      (unless (member value reachables)
-             (vector-set! result-dag node current-reachables))))
-       current-reachables))
+
+    (define (check-reachability? start end)
+    (unless (or(check-fw-or-bw fw start end)
+               (check-fw-or-bw bw start end))
+      (set! result #f)))
     
-    (define (check-fw-or-bw fw-or-bw)
+    (define (check-fw-or-bw fw-or-bw start end)
+      (let ((start-found #f)
+            (res #f))
       (dft
        fw-or-bw
        (lambda (node)(set! current-reachables '()))
-       (lambda (node)(add-to-reachable-elements node))
-       (lambda (node)(add-to-reachable-elements node))
-       (lambda (from to)(add-to-reachable-elements to))
-       (lambda (from to)(add-to-reachable-elements to))
-       (lambda (from to)(add-to-reachable-elements to))))
-    (check-fw-or-bw fw)
-    (check-fw-or-bw bw)
+       (lambda (node)(cond ((= node start)(set! start-found node))
+                           ((and start-found (= node end))(set! res #t))))
+       root-nop
+       edge-nop
+       edge-nop
+       edge-nop)))
+    
     (lb:for-each-node
      DAG
      (lambda (index-node info-node)
        (let ((component-elementen (car info-node)))
          (for-each
-          (lambda (element) (unless(equal? (vector-ref result-dag element) component-elementen)
-                              (set! result #f)))
-          component-elementen))))
-     
-    (newline)
-    (display result-dag)
-    (newline)
-    
-    result))
+          (lambda (start)
+            (for-each
+             (lambda (end) (unless (= start end)
+                             (check-reachability? start end)))
+             component-elementen))            
+          component-elementen))))   
+    result
+    ))
 
-(define (fourth-check-func fw bw g)
+(define (fourth-check-func DAG g)
   (let ((result #t))
-    (define (set-res g from to)
-      (unless (adjacent? g from to)
-        (set! result #f)))
-    (for-each-node fw (lambda (from)(for-each-edge fw from (lambda (to)(set-res g from to)))))
-    (for-each-node bw (lambda (from)(for-each-edge bw from (lambda (to)(set-res g from to)))))
+    (define (c4-dft component-elements representatif)
+      (let ((res #f)
+            (start-found #f)
+            (count 0))
+        (define (add-count node)
+          (if (member node component-elements)
+              (set! count (+ count 1))))
+        (dft
+         g
+         root-nop
+         (lambda (node)(cond ((= node representatif)(set! start-found node)(add-count node))
+                             (start-found (add-count node))))
+         root-nop
+         edge-nop
+         edge-nop
+         edge-nop)
+        (if (= count (length component-elements))
+            (set! res #t))
+        res)) 
+
+(lb:for-each-node
+     DAG
+     (lambda (index-node info-node)
+       (let ((component-elements (car info-node))
+             (representatif (cdr info-node)))
+         (unless (c4-dft component-elements representatif)
+           (set! result #f)))))  
     result))
 
-(define (call-all-on-graph g  text)
+(define (call-all-on-graph g text)
   (newline)
-  (display (list (string-append "SCC-tarj-original  :  "   text)(test g)))
+  (display (list (string-append "SCC-tarj-original  :  "   text)(scc-tarjan g)))
   (newline)
-  (display (list (string-append "SCC-tarj-certifier  :  "  text)(scc-tarjan g)))
+  (display (list (string-append "SCC-tarj-certifier  :  "  text)(scc-tarjan-certified g)))
   (newline)
-  (checker g (scc-tarjan g))
-  (newline)
-  )
+  (checker g (scc-tarjan-certified g)))
 
-(define (call-all-on-graphs list-graph)
+(define (call-all-on-graphs list-graphs)
+  (let ((count 0)
+        (total (length list-graphs)))
   (for-each
-   (lambda (cons-cell) (call-all-on-graph (car cons-cell) (cdr cons-cell)))
-   list-graph))
+   (lambda (cons-cell) (if (call-all-on-graph (car cons-cell) (cdr cons-cell))
+                           (set! count (+ count 1))))
+   list-graphs)
+  (newline)
+  (display "Number of successes : ")(display count)(display " out of ")(display total)
+  ))
 
-(define empty-graph (new #t 1))
-(define list-graph-test (list (cons empty-graph "empty-graph")
+
+(define one-node (new #t 1))
+
+(define paper-example 
+  (let ((g (new #t 8)))
+    (add-edge! g 0 1)
+    (add-edge! g 1 2)
+    (add-edge! g 2 0)
+    (add-edge! g 1 3)
+    (add-edge! g 3 4)
+    (add-edge! g 4 5)
+    (add-edge! g 4 6)
+    (add-edge! g 5 3)
+    (add-edge! g 6 3)
+    (add-edge! g 7 1)
+    (add-edge! g 7 2)
+    (add-edge! g 7 3)
+    (add-edge! g 7 4)
+    g))
+
+(define list-graph-test (list (cons one-node "one-node")
                               (cons paper-example "paper-example")
                               (cons sedgewick172 "sedgewick172")
                               (cons sedgewick172-bis "sedgewick172-bis")
