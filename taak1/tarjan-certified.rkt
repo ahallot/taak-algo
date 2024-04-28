@@ -269,7 +269,7 @@
          (unless (c4-dft component-elements representatif)
            (set! result #f)))))  
     result))
-
+;call original tarjan , cerified one & checker for a given graph and display it with given text (name graph usualy)
 (define (call-all-on-graph g text)
   (newline)
   (display (list (string-append "SCC-TARJAN ORIGINAL  :  "   text)(scc-tarjan g)))
@@ -278,6 +278,7 @@
   (newline)
   (checker g (scc-tarjan-certified g)))
 
+;call for all graph in a list of graphs the previous function & gives you number of successes for the amount of try we did
 (define (call-all-on-graphs list-graphs)
   (let ((count 0)
         (total (length list-graphs)))
@@ -291,6 +292,8 @@
 
 
 (define one-node (new #t 1))
+
+(define three-node (new #t 3))
 
 (define paper-example 
   (let ((g (new #t 8)))
@@ -310,6 +313,7 @@
     g))
 
 (define list-graph-test (list (cons one-node "one-node")
+                              (cons three-node "three-node")
                               (cons paper-example "paper-example")
                               (cons sedgewick172 "sedgewick172")
                               (cons sedgewick172-bis "sedgewick172-bis")
@@ -321,13 +325,3 @@
                               ))
 
 (call-all-on-graphs list-graph-test)
-
-;(dft
-; graph
-; lambda-root
-; lambda-discover-node
-; lambda-mark-node
-; lambda-discover-edge
-; lambda-mark-edge
-; lambda-bumb-edge)
-
