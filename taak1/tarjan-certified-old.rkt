@@ -2,6 +2,7 @@
 
 (import (scheme base)
         (scheme write)
+        (prefix (a-d stack linked) stack:)
         (a-d graph unweighted config)
         (prefix (a-d graph labeled config) lb:)
         (a-d graph-traversing dft-unweighted)
@@ -22,7 +23,7 @@
   (define top '()) 
   (define included-tag 'included) 
 
-  ;we make two graph: Forward edges(fw) and Backward edges(bw)
+  ;we make two graph: Forwardtree(fw) and Backwardtree(bw)
   (define fw (new #t order-g))
   (define bw (new #t order-g))
 
@@ -64,8 +65,8 @@
                                   (vector-ref highest-back-edge to)))
 
            ;When we Process an edge and that the edges can go backward we add it to the bw
-           (when (< (vector-ref highest-back-edge to) (vector-ref preorder-numbers from))                    
-             (add-edge! bw from to)))
+         (when (< (vector-ref highest-back-edge to) (vector-ref preorder-numbers from))                    
+           (add-edge! bw from to)))
          
          ;when from and to have different highest-back-egde we find a edge between two different sc
          (if (not(= (vector-ref highest-back-edge from) (vector-ref highest-back-edge to)))
@@ -79,7 +80,7 @@
            (vector-set! highest-back-edge
                         from (min (vector-ref highest-back-edge from)
                                   (vector-ref preorder-numbers to)))
-           (when (= (vector-ref highest-back-edge from) (vector-ref preorder-numbers to))
+          (when (= (vector-ref highest-back-edge from) (vector-ref preorder-numbers to))
              (add-edge! bw from to)))))
 
   ;Now that the main DFT ended we have our fw and bw, next to it we have now to make the DAG
@@ -99,22 +100,22 @@
      g ;original graph
      root-nop
      (lambda (node) (let((DAG-index (- (vector-ref sc-components node) 1))) ;add a node to the dag as either
-                      (if (not (member DAG-index seen-sc-representative))
-                          (begin                                              ;add a representatif node
-                            (lb:label! DAG DAG-index (cons (list node) node))
-                            (set! seen-sc-representative (append seen-sc-representative (list DAG-index))))
-                          (let ((label (lb:label DAG DAG-index)))             ;add a represented node
-                            (set-car! label (append (car label) (list node)))
-                            (lb:label! DAG DAG-index label)))))
+                        (if (not (member DAG-index seen-sc-representative))
+                        (begin                                              ;add a representatif node
+                          (lb:label! DAG DAG-index (cons (list node) node))
+                          (set! seen-sc-representative (append seen-sc-representative (list DAG-index))))
+                        (let ((label (lb:label DAG DAG-index)))             ;add a represented node
+                          (set-car! label (append (car label) (list node)))
+                          (lb:label! DAG DAG-index label)))))
      root-nop
      edge-nop
      ;We connect the DAG node each to an other, with add-dag-edge if they are from different sc
      (lambda (from to)(if (not(= (vector-ref sc-components from) (vector-ref sc-components to)))
-                          (add-dag-edge from to (cons from to))))
+             (add-dag-edge from to (cons from to))))
      (lambda (from to)(if (not(= (vector-ref sc-components from) (vector-ref sc-components to)))
-                          (add-dag-edge from to (cons from to)))))
+             (add-dag-edge from to (cons from to)))))
     ;we give our result as a list with 
-    (certify (list DAG fw bw) (cons nr-of-components sc-components))))
+  (certify (list DAG fw bw) (list nr-of-components sc-components))))
 
 (define certify cons)
 (define output cdr)
@@ -128,37 +129,39 @@
          (bw (cadr (cdr w)))
          (out-put (output certification))
          (nr-of-components (car out-put))
-         (sc-components (cdr  out-put))
+         (sc-components (cadr  out-put))
          (first-check (first-check-func g DAG fw bw))
          (second-check (second-check-func fw bw g))
          (third-check (third-check-func DAG fw bw))
          (fourth-check (fourth-check-func DAG g sc-components)))
+    (display "Checker final Result : ")(display(and first-check second-check third-check fourth-check))
+    (newline)
     (and first-check second-check third-check fourth-check)))
 
 (define (first-check-func g DAG fw bw) ;check if all node in g are exactly once in the DAG and if the fw and bw uses the same nodes.
   (let* ((result #t)
-         (order-g (order g))
-         (total-node-gerepresenteerd-in-dag 0)
-         (fw-elements '())
-         (vector-g (make-vector order-g 0)))
+        (order-g (order g))
+        (total-node-gerepresenteerd-in-dag 0)
+        (fw-elements '())
+        (vector-g (make-vector order-g 0)))
     (lb:for-each-node  ;we check the dag
      DAG
      (lambda (node-index info-node)
        (let ((component-elementen (car info-node)))
-         (for-each
-          (lambda (g-node)
-            (if (< g-node order-g)
-                (let ((value (vector-ref vector-g g-node)))
-                  (if (= value 0)
-                      (begin
-                        (vector-set! vector-g g-node (+ value 1))
-                        (set! total-node-gerepresenteerd-in-dag
-                              (+ total-node-gerepresenteerd-in-dag 1)))
-                      (set! result #f)))
-                (set! result #f)))
-          component-elementen))))
+                         (for-each
+                          (lambda (g-node)
+                            (if (< g-node order-g)
+                                (let ((value (vector-ref vector-g g-node)))
+                                  (if (= value 0)
+                                      (begin
+                                        (vector-set! vector-g g-node (+ value 1))
+                                        (set! total-node-gerepresenteerd-in-dag
+                                              (+ total-node-gerepresenteerd-in-dag 1)))
+                                      (set! result #f)))
+                                (set! result #f)))
+                          component-elementen))))
     (unless (= total-node-gerepresenteerd-in-dag order-g)
-      (set! result #f))
+         (set! result #f))
     ;we check fw and bw
     (for-each-node
      fw
@@ -183,22 +186,22 @@
         (current-reachables '()))
     ;checks if end is reacheable starting from start in fw or bw
     (define (check-reachability? start end)
-      (unless (or(check-fw-or-bw fw start end)
-                 (check-fw-or-bw bw start end))
-        (set! result #f)))
+    (unless (or(check-fw-or-bw fw start end)
+               (check-fw-or-bw bw start end))
+      (set! result #f)))
     ;DFT on the fw or bw that will give is if a end is reachable from the start node or not
     (define (check-fw-or-bw fw-or-bw start end)
       (let ((start-found #f)
             (res #f))
-        (dft
-         fw-or-bw
-         (lambda (node)(set! current-reachables '()))
-         (lambda (node)(cond ((= node start)(set! start-found node))
-                             ((and start-found (= node end))(set! res #t))))
-         root-nop
-         edge-nop
-         edge-nop
-         edge-nop)))
+      (dft
+       fw-or-bw
+       (lambda (node)(set! current-reachables '()))
+       (lambda (node)(cond ((= node start)(set! start-found node))
+                           ((and start-found (= node end))(set! res #t))))
+       root-nop
+       edge-nop
+       edge-nop
+       edge-nop)))
     ;if for sc all nodes can reach there neighbours element in the same sc. if only one is not reachable set result false.
     (lb:for-each-node
      DAG
@@ -211,7 +214,8 @@
                              (check-reachability? start end)))
              component-elementen))            
           component-elementen))))   
-    result))
+    result
+    ))
 
 ;similar working as check 3. We check if all element we can reach from representatif are actualy in the component
 (define (fourth-check-func DAG g sc-components)
@@ -256,8 +260,8 @@
              edge-nop
              edge-nop)
             res)))
-    ;check for all representatif if they have with their component-elements all the reachable elements
-    (lb:for-each-node
+;check for all representatif if they have with their component-elements all the reachable elements
+(lb:for-each-node
      DAG
      (lambda (index-node info-node)
        (let ((component-elements (car info-node))
@@ -267,28 +271,24 @@
     result))
 ;call original tarjan , cerified one & checker for a given graph and display it with given text (name graph usualy)
 (define (call-all-on-graph g text)
-  (define certified (scc-tarjan-certified g))
-  (display "------------------------[ ")(display text)(display " ]------------------------")
   (newline)
   (display (list (string-append "SCC-TARJAN ORIGINAL  :  "   text)(scc-tarjan g)))
   (newline)
-  (display (list (string-append "SCC-TARJAN CERTIFIED  :  "  text) certified))
+  (display (list (string-append "SCC-TARJAN CERTIFIED  :  "  text)(scc-tarjan-certified g)))
   (newline)
-  (display (list "Checker final Result : " (check-tarjan g certified)))
-  (newline))
+  (check-tarjan g (scc-tarjan-certified g)))
 
 ;call for all graph in a list of graphs the previous function & gives you number of successes for the amount of try we did
 (define (call-all-on-graphs list-graphs)
   (let ((count 0)
         (total (length list-graphs)))
-    (for-each
-     (lambda (cons-cell)
-       (call-all-on-graph (car cons-cell) (cdr cons-cell))
-        (set! count (+ count 1)))
-     list-graphs)
-    (display "------------------------[ DEMO RESULTS ]------------------------")    
-    (newline)    
-    (display "Number of successes : ")(display count)(display " out of ")(display total)))
+  (for-each
+   (lambda (cons-cell) (if (call-all-on-graph (car cons-cell) (cdr cons-cell))
+                           (set! count (+ count 1))))
+   list-graphs)
+  (newline)
+  (display "Number of successes : ")(display count)(display " out of ")(display total)
+  ))
 
 
 (define one-node (new #t 1))
@@ -321,6 +321,7 @@
                               (cons full-cycle "full-cycle")
                               (cons a-list "a-list")
                               (cons dag-1 "dag-1")
-                              (cons scc4 "scc4")))
+                              (cons scc4 "scc4")
+                              ))
 
 (call-all-on-graphs list-graph-test)
